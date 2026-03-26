@@ -50,6 +50,15 @@ CYPHER: MATCH (so:SalesOrder)-[:FULFILLED_BY]->(d:Delivery) WHERE NOT (d)-[:BILL
 
 Q: "Which materials appear most frequently in sales orders?"
 CYPHER: MATCH (soi:SalesOrderItem)-[:REFERENCES_MATERIAL]->(m:Material) RETURN m.product AS material, m.productDescription AS description, count(soi) AS frequency ORDER BY frequency DESC LIMIT 10
+
+Q: "Which products are associated with the highest number of billing documents?"
+CYPHER: MATCH (bi:BillingItem)-[:BILLS_ITEM]->(di:DeliveryItem) MATCH (di)-[:FULFILLS_ITEM]->(soi:SalesOrderItem)-[:REFERENCES_MATERIAL]->(m:Material) RETURN m.product AS material, m.productDescription AS description, count(DISTINCT bi) AS billingCount ORDER BY billingCount DESC LIMIT 10
+
+Q: "Find orders that were billed without delivery"
+CYPHER: MATCH (b:BillingDocument) WHERE NOT EXISTS {{ MATCH (d:Delivery)-[:BILLED_IN]->(b) }} RETURN b.billingDocument, b.soldToParty AS customerId, b.totalNetAmount AS amount, b.billingDocumentDate AS date LIMIT 25
+
+Q: "Top products by billing count"
+CYPHER: MATCH (bi:BillingItem) MATCH (bi)-[:BILLS_ITEM]->(di:DeliveryItem)-[:FULFILLS_ITEM]->(soi:SalesOrderItem)-[:REFERENCES_MATERIAL]->(m:Material) RETURN m.product AS material, m.productDescription AS description, count(bi) AS billingItemCount ORDER BY billingItemCount DESC LIMIT 10
 """
 
 
