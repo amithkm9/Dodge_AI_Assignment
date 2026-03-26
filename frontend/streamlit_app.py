@@ -578,10 +578,7 @@ def render_graph_panel():
             highlightColor="#ef4444",
         )
         
-        # Use a key based on highlighted nodes to force re-render when highlights change
-        graph_key = f"graph_{len(st.session_state.highlighted_nodes)}_{hash(tuple(sorted(st.session_state.highlighted_nodes[:5]))) if st.session_state.highlighted_nodes else 0}"
-        
-        selected = agraph(nodes=nodes, edges=edges, config=config, key=graph_key)
+        selected = agraph(nodes=nodes, edges=edges, config=config)
         if selected and selected != st.session_state.selected_node:
             st.session_state.selected_node = selected
             st.rerun()
