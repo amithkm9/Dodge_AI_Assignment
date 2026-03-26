@@ -1,7 +1,7 @@
 # Cursor — Project Summary
 
 **Project:** Dodge AI — SAP O2C Graph Explorer  
-**Model:** claude-3.5-sonnet  
+**Model:** claude-sonnet-4.6
 **Exported:** 2026-03-26
 
 ---
