@@ -4,7 +4,7 @@ A graph-based data modeling and query system that allows users to explore SAP Or
 
 ## Live Demo
 
-🔗 **Demo URL**: *Deploy using instructions below to create your own instance*
+🔗 **Demo URL**: [https://dodge-ai-assignment-alpha.vercel.app](https://dodge-ai-assignment-alpha.vercel.app)
 
 > **Note**: This application requires an OpenAI API key and Neo4j database. See [Deployment](#deployment) section for hosting options.
 

@@ -346,4 +346,76 @@ The `eslint` and `typescript` keys in `next.config.ts` were removed in Next.js 1
 
 ---
 
+## Session 6 — Cloud Deployment
+
+### Stack
+
+| Layer | Service | URL |
+|-------|---------|-----|
+| Frontend (Next.js) | Vercel | https://dodge-ai-assignment-alpha.vercel.app |
+| Backend (FastAPI) | Render (Free) | https://dodge-ai-backend-3y5k.onrender.com |
+| Database (Neo4j) | Aura Free | `neo4j+s://9e5f3d2d.databases.neo4j.io` |
+
+### How tools were used
+
+Checked git remotes to confirm the repo was already on GitHub (`amithkm9/Dodge_AI_Assignment`). Inspected `render.yaml` and `railway.toml` to understand existing deployment config. Read `backend/app/config.py` and `backend/app/data/seed.py` to understand how credentials and data directory are consumed.
+
+### Deployment steps
+
+**Step 1 — Neo4j Aura (cloud database)**
+
+Created a free AuraDB instance at [neo4j.com/cloud/aura](https://neo4j.com/cloud/aura). Wrote credentials into `backend/.env` (gitignored). Ran the seed script locally pointed at the cloud instance:
+
+```bash
+cd backend
+python -m app.data.seed --data-dir ../sap-o2c-data
+```
+
+Seeding completed in ~5 seconds. Final node counts:
+- BillingItem: 245, SalesOrderItem: 167, BillingDocument: 163
+- DeliveryItem: 137, JournalEntry: 123, SalesOrder: 100
+- Delivery: 86, Payment: 76, Material: 69, Plant: 44, Customer: 8, Address: 8
+
+**Step 2 — Render (backend)**
+
+Connected GitHub repo on [render.com](https://render.com). Set runtime to Docker, root directory to `backend`. Added 5 environment variables: `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `OPENAI_API_KEY`, `CORS_ORIGINS=["*"]`. Render built the Dockerfile and deployed. Backend live in ~4 minutes.
+
+**Step 3 — Vercel (frontend)**
+
+Imported GitHub repo on [vercel.com](https://vercel.com). Set root directory to `frontend`. Added env var `NEXT_PUBLIC_API_BASE=https://dodge-ai-backend-3y5k.onrender.com`.
+
+### Issues & fixes
+
+**Issue — Vercel build failed: `Module not found: Can't resolve '@/lib/api'`**
+
+`frontend/src/lib/api.ts` was never committed to git. Root cause: `.gitignore` had a bare `lib/` entry (copied from a Python boilerplate template) that matched `frontend/src/lib/`. Fixed by scoping it:
+
+```diff
+- lib/
+- lib64/
++ backend/lib/
++ backend/lib64/
+```
+
+Committed `frontend/src/lib/api.ts` alongside the `.gitignore` fix and pushed.
+
+**Issue — Vercel build failed: `No Output Directory named 'public' found`**
+
+Vercel didn't auto-detect Next.js because the Application Preset was blank during project setup (root directory was set to `frontend`, which confused the detector). Fixed by adding `frontend/vercel.json`:
+
+```json
+{
+  "framework": "nextjs"
+}
+```
+
+Next deployment succeeded in 32 seconds.
+
+### Notes
+
+- Render free tier spins down after 15 minutes of inactivity — first request after idle takes 30–50 seconds (cold start). Acceptable for a demo.
+- `CORS_ORIGINS=["*"]` is set on the backend for simplicity. For production, restrict to the Vercel domain.
+
+---
+
 *— End of transcript —*
