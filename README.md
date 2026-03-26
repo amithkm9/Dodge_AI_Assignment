@@ -359,8 +359,8 @@ def validate_cypher(cypher: str) -> tuple[bool, str | None]:
 ### 1. Clone and Setup
 
 ```bash
-git clone https://github.com/yourusername/dodge-ai.git
-cd dodge-ai
+git clone https://github.com/amithkm9/Dodge_AI_Assignment.git
+cd Dodge_AI_Assignment
 ```
 
 ### 2. Configure Environment
