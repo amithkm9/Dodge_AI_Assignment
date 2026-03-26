@@ -14,310 +14,405 @@ API_BASE = os.environ.get("API_BASE", "http://localhost:8000")
 
 # Page config
 st.set_page_config(
-    page_title="Dodge AI",
-    page_icon="⚡",
+    page_title="Dodge AI - Order to Cash",
+    page_icon="🔗",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# Clean white theme CSS
+# Modern UI CSS matching the reference design
 st.markdown("""
 <style>
-    /* Global white background */
-    .stApp { background-color: #ffffff; }
+    /* Global styling */
+    .stApp { background-color: #f8fafc; }
     .main .block-container { 
-        padding: 1rem 2rem; 
+        padding: 0.5rem 1rem; 
         max-width: 100%;
-        background-color: #ffffff;
     }
     
-    /* Header */
-    .app-header {
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Top navigation bar */
+    .top-nav {
         display: flex;
         align-items: center;
+        padding: 8px 16px;
+        background: white;
+        border-bottom: 1px solid #e2e8f0;
+        margin: -0.5rem -1rem 1rem -1rem;
         gap: 12px;
-        padding: 12px 0;
-        border-bottom: 1px solid #e5e7eb;
-        margin-bottom: 20px;
     }
-    .app-logo {
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        border-radius: 10px;
+    .nav-title {
+        font-size: 0.9rem;
+        color: #64748b;
+    }
+    .nav-title strong {
+        color: #1e293b;
+    }
+    
+    /* Main container */
+    .main-container {
+        display: flex;
+        gap: 0;
+        height: calc(100vh - 80px);
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    /* Graph panel */
+    .graph-panel {
+        flex: 1;
+        background: #f0f7ff;
+        position: relative;
+        min-height: 500px;
+    }
+    
+    /* Graph controls */
+    .graph-controls {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        gap: 8px;
+        z-index: 100;
+    }
+    .control-btn {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        color: #475569;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .control-btn:hover {
+        background: #f8fafc;
+    }
+    
+    /* Node detail popup */
+    .node-popup {
+        position: absolute;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        padding: 16px;
+        min-width: 320px;
+        max-width: 400px;
+        z-index: 1000;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .node-popup-header {
+        font-weight: 600;
+        font-size: 1rem;
+        color: #1e293b;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .node-popup-row {
+        display: flex;
+        padding: 4px 0;
+        font-size: 0.85rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .node-popup-key {
+        color: #64748b;
+        min-width: 140px;
+        font-weight: 500;
+    }
+    .node-popup-value {
+        color: #1e293b;
+        word-break: break-word;
+    }
+    .node-popup-footer {
+        margin-top: 12px;
+        padding-top: 8px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 0.8rem;
+        color: #94a3b8;
+    }
+    
+    /* Chat panel */
+    .chat-panel {
+        width: 380px;
+        background: white;
+        border-left: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+    }
+    .chat-header {
+        padding: 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .chat-header-title {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-bottom: 8px;
+    }
+    .chat-agent {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .chat-agent-avatar {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
         color: white;
-        font-size: 20px;
-    }
-    .app-title { font-size: 1.4rem; font-weight: 700; color: #111827; margin: 0; }
-    .app-subtitle { font-size: 0.8rem; color: #6b7280; margin: 0; }
-    
-    /* Panel headers */
-    .panel-header {
-        font-size: 0.9rem;
         font-weight: 600;
-        color: #374151;
-        margin-bottom: 12px;
+        font-size: 0.9rem;
+    }
+    .chat-agent-name {
+        font-weight: 600;
+        color: #1e293b;
+    }
+    .chat-agent-role {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+    
+    /* Chat messages */
+    .chat-messages {
+        flex: 1;
+        padding: 16px;
+        overflow-y: auto;
+        background: #fafafa;
+    }
+    .chat-message {
+        margin-bottom: 16px;
+    }
+    .chat-message-user {
+        display: flex;
+        justify-content: flex-end;
+    }
+    .chat-message-user .bubble {
+        background: #1e293b;
+        color: white;
+        padding: 10px 14px;
+        border-radius: 12px 12px 4px 12px;
+        max-width: 85%;
+        font-size: 0.9rem;
+    }
+    .chat-message-assistant {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+    }
+    .chat-message-assistant .avatar {
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        border-radius: 6px;
         display: flex;
         align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+    }
+    .chat-message-assistant .bubble {
+        background: white;
+        color: #1e293b;
+        padding: 10px 14px;
+        border-radius: 12px 12px 12px 4px;
+        max-width: 85%;
+        font-size: 0.9rem;
+        border: 1px solid #e2e8f0;
+    }
+    
+    /* Chat input */
+    .chat-input-area {
+        padding: 16px;
+        border-top: 1px solid #e2e8f0;
+        background: white;
+    }
+    .chat-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 10px;
+        font-size: 0.8rem;
+        color: #22c55e;
+    }
+    .chat-status-dot {
+        width: 8px;
+        height: 8px;
+        background: #22c55e;
+        border-radius: 50%;
+    }
+    .chat-input-wrapper {
+        display: flex;
         gap: 8px;
+    }
+    
+    /* Streamlit overrides */
+    .stTextInput > div > div > input {
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        padding: 10px 14px;
+        font-size: 0.9rem;
+        background: #f8fafc;
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .stTextInput > div > div > input::placeholder {
+        color: #94a3b8;
+    }
+    
+    .stButton > button {
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 8px 16px;
+    }
+    .stButton > button[kind="primary"] {
+        background: #1e293b;
+        color: white;
+        border: none;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background: #334155;
+    }
+    .stButton > button[kind="secondary"] {
+        background: white;
+        color: #475569;
+        border: 1px solid #e2e8f0;
     }
     
     /* Legend */
     .legend {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
-        padding: 8px 12px;
-        background: #f9fafb;
-        border-radius: 8px;
-        margin-bottom: 12px;
-        border: 1px solid #e5e7eb;
+        gap: 16px;
+        padding: 10px 16px;
+        background: white;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.8rem;
     }
     .legend-item {
         display: flex;
         align-items: center;
         gap: 6px;
-        font-size: 0.75rem;
-        color: #4b5563;
+        color: #475569;
     }
     .legend-dot {
-        width: 10px;
-        height: 10px;
+        width: 12px;
+        height: 12px;
         border-radius: 50%;
     }
     
-    /* Graph container */
-    .graph-container {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 12px;
-    }
-    
-    /* Chat container */
-    .chat-container {
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 16px;
-        height: 480px;
-        overflow-y: auto;
-    }
-    
-    /* Chat messages */
-    .message-user {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 12px;
-    }
-    .message-user-bubble {
-        background: #6366f1;
-        color: white;
-        padding: 10px 14px;
-        border-radius: 16px 16px 4px 16px;
-        max-width: 85%;
-        font-size: 0.9rem;
-        line-height: 1.4;
-    }
-    .message-assistant {
-        display: flex;
-        justify-content: flex-start;
-        margin-bottom: 12px;
-    }
-    .message-assistant-bubble {
-        background: #ffffff;
-        color: #1f2937;
-        padding: 10px 14px;
-        border-radius: 16px 16px 16px 4px;
-        max-width: 85%;
-        font-size: 0.9rem;
-        line-height: 1.5;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    
-    /* Chat input area */
-    .chat-input-area {
-        display: flex;
-        gap: 8px;
-        margin-top: 12px;
-        padding-top: 12px;
-        border-top: 1px solid #e5e7eb;
-    }
-    
-    /* Node detail card */
-    .node-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        padding: 14px;
-        margin-top: 12px;
-    }
-    .node-card-header {
-        font-weight: 600;
-        color: #6366f1;
-        font-size: 0.9rem;
-        margin-bottom: 10px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #f3f4f6;
-    }
-    .node-property {
-        font-size: 0.8rem;
-        color: #4b5563;
-        padding: 3px 0;
-    }
-    .node-property-key {
-        color: #6b7280;
-        font-weight: 500;
-    }
-    
-    /* Buttons */
-    .stButton > button {
-        border-radius: 8px;
-        font-size: 0.85rem;
-        font-weight: 500;
-        border: 1px solid #e5e7eb;
-        background: #ffffff;
-        color: #374151;
-        transition: all 0.15s;
-    }
-    .stButton > button:hover {
-        background: #f9fafb;
-        border-color: #d1d5db;
-    }
-    .stButton > button[kind="primary"] {
-        background: #6366f1;
-        color: white;
-        border: none;
-    }
-    .stButton > button[kind="primary"]:hover {
-        background: #4f46e5;
-    }
-    
-    /* Text input */
-    .stTextInput > div > div > input {
-        border-radius: 8px;
-        border: 1px solid #e5e7eb;
-        padding: 10px 14px;
-        font-size: 0.9rem;
-    }
-    .stTextInput > div > div > input:focus {
-        border-color: #6366f1;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    }
-    
-    /* Expander */
+    /* Expander styling */
     .streamlit-expanderHeader {
         font-size: 0.85rem;
         font-weight: 500;
-        color: #6b7280;
-    }
-    
-    /* Hide streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    /* Example query buttons */
-    .example-btn {
-        background: #f3f4f6;
-        border: 1px solid #e5e7eb;
+        color: #475569;
+        background: #f8fafc;
         border-radius: 6px;
-        padding: 6px 10px;
-        font-size: 0.75rem;
-        color: #4b5563;
-        cursor: pointer;
-        transition: all 0.15s;
-    }
-    .example-btn:hover {
-        background: #e5e7eb;
     }
     
-    /* Streaming cursor animation */
-    .streaming-cursor {
-        animation: blink 1s infinite;
-        color: #6366f1;
-    }
-    @keyframes blink {
-        0%, 50% { opacity: 1; }
-        51%, 100% { opacity: 0; }
-    }
-    .streaming-indicator {
-        color: #9ca3af;
-        font-style: italic;
-    }
-    
-    /* Stats panel */
-    .stats-panel {
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
+    /* Node detail card in sidebar */
+    .node-detail-card {
+        background: white;
+        border: 1px solid #e2e8f0;
         border-radius: 8px;
         padding: 12px;
-        margin-bottom: 12px;
+        margin-top: 8px;
     }
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 8px;
+    .node-detail-header {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #1e293b;
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #f1f5f9;
     }
-    .stat-item {
-        text-align: center;
-        padding: 8px;
-        background: white;
-        border-radius: 6px;
-        border: 1px solid #e5e7eb;
+    .node-detail-entity {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-bottom: 4px;
     }
-    .stat-value {
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: #6366f1;
+    .node-detail-row {
+        display: flex;
+        font-size: 0.8rem;
+        padding: 3px 0;
     }
-    .stat-label {
-        font-size: 0.7rem;
-        color: #6b7280;
-        margin-top: 2px;
+    .node-detail-key {
+        color: #64748b;
+        min-width: 120px;
+    }
+    .node-detail-value {
+        color: #1e293b;
+        font-weight: 500;
+    }
+    .node-detail-footer {
+        margin-top: 8px;
+        padding-top: 6px;
+        border-top: 1px solid #f1f5f9;
+        font-size: 0.75rem;
+        color: #94a3b8;
+        font-style: italic;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Node colors
+# Node colors matching reference
 NODE_COLORS = {
-    "Customer": "#3b82f6",
-    "SalesOrder": "#8b5cf6",
-    "Delivery": "#10b981",
-    "BillingDocument": "#ef4444",
-    "JournalEntry": "#f59e0b",
-    "Payment": "#eab308",
-    "Material": "#06b6d4",
-    "Plant": "#84cc16",
+    "Customer": "#3b82f6",      # Blue
+    "SalesOrder": "#8b5cf6",    # Purple
+    "SalesOrderItem": "#a78bfa", # Light purple
+    "Delivery": "#10b981",      # Green
+    "DeliveryItem": "#34d399",  # Light green
+    "BillingDocument": "#ef4444", # Red
+    "BillingItem": "#f87171",   # Light red
+    "JournalEntry": "#f59e0b",  # Orange
+    "Payment": "#eab308",       # Yellow
+    "Material": "#06b6d4",      # Cyan
+    "Plant": "#84cc16",         # Lime
+    "Address": "#6366f1",       # Indigo
 }
 
 NODE_SIZES = {
-    "Customer": 28,
-    "SalesOrder": 24,
-    "Delivery": 24,
-    "BillingDocument": 24,
-    "JournalEntry": 20,
-    "Payment": 20,
-    "Material": 20,
-    "Plant": 20,
+    "Customer": 30,
+    "SalesOrder": 26,
+    "SalesOrderItem": 18,
+    "Delivery": 26,
+    "DeliveryItem": 18,
+    "BillingDocument": 26,
+    "BillingItem": 18,
+    "JournalEntry": 24,
+    "Payment": 24,
+    "Material": 22,
+    "Plant": 22,
+    "Address": 20,
 }
 
 
 def init_session_state():
     defaults = {
-        "messages": [],
+        "messages": [
+            {"role": "assistant", "content": "Hi! I can help you analyze the **Order to Cash** process."}
+        ],
         "highlighted_nodes": [],
         "selected_node": None,
         "graph_data": {"nodes": [], "edges": []},
         "last_cypher": None,
-        "streaming_active": False,
-        "streaming_message": None,
-        "streaming_history": None,
-        "graph_stats": None,
+        "show_node_detail": False,
+        "node_detail_data": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -368,58 +463,17 @@ def chat_simple(message: str, history: list) -> dict:
         resp = requests.post(
             f"{API_BASE}/api/chat/simple",
             json={"message": message, "conversation_history": history},
-            timeout=60,
+            timeout=90,
         )
         return resp.json() if resp.ok else {"answer": "Request failed", "cypher_query": None, "highlighted_nodes": []}
     except Exception as e:
         return {"answer": f"Error: {str(e)}", "cypher_query": None, "highlighted_nodes": []}
 
 
-def chat_streaming(message: str, history: list):
-    """
-    Stream chat response using SSE from /api/chat endpoint.
-    Yields tuples of (event_type, content) for real-time updates.
-    """
-    try:
-        with requests.post(
-            f"{API_BASE}/api/chat",
-            json={"message": message, "conversation_history": history},
-            stream=True,
-            timeout=120,
-        ) as response:
-            if not response.ok:
-                yield ("error", "Request failed")
-                return
-            
-            for line in response.iter_lines():
-                if line:
-                    line_str = line.decode("utf-8")
-                    if line_str.startswith("data: "):
-                        try:
-                            data = json.loads(line_str[6:])
-                            event_type = data.get("type", "unknown")
-                            content = data.get("content", "")
-                            yield (event_type, content)
-                            
-                            if event_type == "done":
-                                return
-                        except json.JSONDecodeError:
-                            continue
-    except Exception as e:
-        yield ("error", f"Connection error: {str(e)}")
-
-
-def fetch_graph_stats() -> dict:
-    """Fetch graph statistics from the backend."""
-    try:
-        resp = requests.get(f"{API_BASE}/api/graph/stats", timeout=10)
-        return resp.json() if resp.ok else {}
-    except:
-        return {}
-
-
-def build_agraph_data(graph_data: dict, highlighted: list = None):
+def build_agraph_data(graph_data: dict, highlighted: list = None, focus_nodes: list = None):
+    """Build nodes and edges for agraph visualization."""
     highlighted = set(highlighted or [])
+    focus_nodes = set(focus_nodes or [])
     nodes, edges, seen = [], [], set()
     
     for node in graph_data.get("nodes", []):
@@ -433,386 +487,179 @@ def build_agraph_data(graph_data: dict, highlighted: list = None):
         color = NODE_COLORS.get(label, "#6366f1")
         size = NODE_SIZES.get(label, 20)
         
-        # Highlight nodes from query results - make them red and larger
+        # Highlight nodes from query results
         is_highlighted = nid in highlighted
-        if is_highlighted:
-            color = "#dc2626"  # Bright red
-            size = int(size * 1.5)
+        is_focused = nid in focus_nodes
+        
+        if is_highlighted or is_focused:
+            color = "#dc2626"  # Red for highlighted
+            size = int(size * 1.4)
+        
+        # Create tooltip with node info
+        tooltip = f"{label}\n{name}"
         
         nodes.append(Node(
             id=nid,
-            label=name[:12] + "..." if len(name) > 12 else name,
+            label=name[:15] + "..." if len(name) > 15 else name,
             size=size,
             color=color,
-            title=f"{'⭐ ' if is_highlighted else ''}{label}: {name}",
+            title=tooltip,
             shape="dot",
+            font={"size": 10, "color": "#475569"},
         ))
     
     for edge in graph_data.get("edges", []):
         src = edge["source"] if isinstance(edge["source"], str) else edge["source"]["id"]
         tgt = edge["target"] if isinstance(edge["target"], str) else edge["target"]["id"]
+        rel = edge.get("relationship", "")
+        
         if src in seen and tgt in seen:
             # Highlight edges connected to highlighted nodes
-            edge_color = "#ef4444" if (src in highlighted or tgt in highlighted) else "#d1d5db"
-            edges.append(Edge(source=src, target=tgt, color=edge_color))
+            is_highlighted_edge = (src in highlighted or tgt in highlighted)
+            edge_color = "#ef4444" if is_highlighted_edge else "#94a3b8"
+            edge_width = 2 if is_highlighted_edge else 1
+            
+            edges.append(Edge(
+                source=src, 
+                target=tgt, 
+                color=edge_color,
+                width=edge_width,
+                title=rel,
+            ))
     
     return nodes, edges
 
 
-def render_header():
-    st.markdown("""
-    <div class="app-header">
-        <div class="app-logo">⚡</div>
-        <div>
-            <div class="app-title">Dodge AI</div>
-            <div class="app-subtitle">SAP Order-to-Cash Graph Explorer</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
 def render_legend():
-    items = "".join([
-        f'<span class="legend-item"><span class="legend-dot" style="background:{c}"></span>{l.replace("BillingDocument","Invoice").replace("JournalEntry","Journal")}</span>'
-        for l, c in NODE_COLORS.items()
-    ])
-    # Add highlighted indicator
-    items += '<span class="legend-item"><span class="legend-dot" style="background:#dc2626"></span>Highlighted</span>'
-    st.markdown(f'<div class="legend">{items}</div>', unsafe_allow_html=True)
-
-
-def render_graph_stats():
-    """Render graph statistics panel showing node and relationship counts."""
-    # Fetch stats if not cached or refresh requested
-    if st.session_state.graph_stats is None:
-        st.session_state.graph_stats = fetch_graph_stats()
-    
-    stats = st.session_state.graph_stats
-    if not stats:
-        return
-    
-    node_counts = stats.get("node_counts", {})
-    rel_count = stats.get("relationship_count", 0)
-    
-    # Calculate total nodes
-    total_nodes = sum(node_counts.values())
-    
-    # Display key stats in a compact grid
-    with st.expander("📊 Graph Statistics", expanded=False):
-        # Summary row
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total Nodes", f"{total_nodes:,}")
-        with col2:
-            st.metric("Relationships", f"{rel_count:,}")
-        
-        # Node breakdown
-        st.markdown("**Node counts by type:**")
-        cols = st.columns(4)
-        sorted_counts = sorted(node_counts.items(), key=lambda x: x[1], reverse=True)
-        for i, (label, count) in enumerate(sorted_counts):
-            with cols[i % 4]:
-                display_label = label.replace("BillingDocument", "Invoice").replace("JournalEntry", "Journal")
-                color = NODE_COLORS.get(label, "#6366f1")
-                st.markdown(
-                    f'<div style="text-align:center; padding:4px;">'
-                    f'<span style="color:{color}; font-weight:600;">{count:,}</span><br>'
-                    f'<span style="font-size:0.7rem; color:#6b7280;">{display_label}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
-
-
-def render_graph_panel():
-    st.markdown('<div class="panel-header">🔗 Knowledge Graph</div>', unsafe_allow_html=True)
-    
-    # Show highlighted count if any
-    if st.session_state.highlighted_nodes:
-        st.markdown(
-            f'<div style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:8px 12px; margin-bottom:10px; font-size:0.85rem;">'
-            f'🔴 <strong>{len(st.session_state.highlighted_nodes)}</strong> nodes highlighted from your query (shown in red)'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-    
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        if st.button("↻ Reload", use_container_width=True):
-            st.session_state.graph_data = fetch_graph_overview()
-            st.session_state.graph_stats = None  # Refresh stats too
-            st.rerun()
-    with col2:
-        if st.button("✕ Clear", use_container_width=True):
-            st.session_state.selected_node = None
-            st.session_state.highlighted_nodes = []
-            st.rerun()
-    with col3:
-        search = st.text_input("Search", placeholder="Search nodes...", label_visibility="collapsed")
-    
-    if search and len(search) >= 2:
-        results = search_nodes(search)
-        if results:
-            for r in results[:3]:
-                if st.button(f"→ {r['name'][:25]} ({r['label']})", key=f"s_{r['id']}"):
-                    st.session_state.selected_node = r["id"]
-                    st.rerun()
-    
-    render_legend()
-    render_graph_stats()
-    
-    if not st.session_state.graph_data.get("nodes"):
-        with st.spinner("Loading graph..."):
-            st.session_state.graph_data = fetch_graph_overview()
-    
-    data = st.session_state.graph_data
-    if data.get("nodes"):
-        nodes, edges = build_agraph_data(data, st.session_state.highlighted_nodes)
-        
-        config = Config(
-            width="100%",
-            height=380,
-            directed=True,
-            physics=True,
-            hierarchical=False,
-            nodeHighlightBehavior=True,
-            highlightColor="#ef4444",
-        )
-        
-        selected = agraph(nodes=nodes, edges=edges, config=config)
-        if selected and selected != st.session_state.selected_node:
-            st.session_state.selected_node = selected
-            st.rerun()
-    
-    # Node detail
-    if st.session_state.selected_node:
-        detail = fetch_node_detail(st.session_state.selected_node)
-        if detail:
-            label = detail.get('label', 'Node')
-            raw_id = st.session_state.selected_node.split('_', 1)[-1]
-            
-            st.markdown(f'<div class="node-card"><div class="node-card-header">📋 {label}: {raw_id}</div>', unsafe_allow_html=True)
-            
-            props = detail.get("properties", {})
-            for k, v in list(props.items())[:6]:
-                if v is not None:
-                    st.markdown(f'<div class="node-property"><span class="node-property-key">{k}:</span> {v}</div>', unsafe_allow_html=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            neighbors = detail.get("neighbors", [])
-            if neighbors:
-                with st.expander(f"Connected nodes ({len(neighbors)})"):
-                    for n in neighbors[:5]:
-                        dir_icon = "→" if n["direction"] == "outgoing" else "←"
-                        if st.button(f"{dir_icon} {n['relationship']}: {n['name'][:20]}", key=f"nb_{n['id']}"):
-                            st.session_state.selected_node = n["id"]
-                            st.rerun()
-            
-            if st.button("🔍 Expand this node"):
-                expansion = expand_node_api(st.session_state.selected_node)
-                if expansion.get("nodes"):
-                    existing = {n["id"] for n in st.session_state.graph_data.get("nodes", [])}
-                    for new in expansion["nodes"]:
-                        if new["id"] not in existing:
-                            st.session_state.graph_data["nodes"].append(new)
-                    st.session_state.graph_data["edges"].extend(expansion.get("edges", []))
-                    st.rerun()
-
-
-def render_chat_panel():
-    st.markdown('<div class="panel-header">💬 Chat with your data</div>', unsafe_allow_html=True)
-    
-    # Example queries
-    examples = [
-        "Show all customers with order totals",
-        "Which orders are not delivered?",
-        "Trace complete O2C flows",
-        "Find broken/incomplete flows",
-        "Top products by billing count",
+    """Render the node type legend."""
+    legend_items = [
+        ("Customer", NODE_COLORS["Customer"]),
+        ("SalesOrder", NODE_COLORS["SalesOrder"]),
+        ("Delivery", NODE_COLORS["Delivery"]),
+        ("Invoice", NODE_COLORS["BillingDocument"]),
+        ("Journal", NODE_COLORS["JournalEntry"]),
+        ("Payment", NODE_COLORS["Payment"]),
+        ("Material", NODE_COLORS["Material"]),
+        ("Plant", NODE_COLORS["Plant"]),
     ]
     
-    with st.expander("💡 Example queries"):
-        cols = st.columns(2)
-        for i, ex in enumerate(examples):
-            with cols[i % 2]:
-                if st.button(ex, key=f"ex_{i}", use_container_width=True):
-                    send_message(ex)
+    items_html = "".join([
+        f'<span class="legend-item"><span class="legend-dot" style="background:{color}"></span>{name}</span>'
+        for name, color in legend_items
+    ])
+    items_html += '<span class="legend-item"><span class="legend-dot" style="background:#dc2626"></span>Highlighted</span>'
     
-    # Chat messages container
-    chat_container = st.container()
+    st.markdown(f'<div class="legend">{items_html}</div>', unsafe_allow_html=True)
+
+
+def render_node_detail_popup(node_id: str):
+    """Render detailed node information in a popup-style card."""
+    detail = fetch_node_detail(node_id)
+    if not detail:
+        return
     
-    with chat_container:
-        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-        
-        if not st.session_state.messages and not st.session_state.get("streaming_active"):
-            st.markdown("""
-            <div style="text-align:center; padding:40px; color:#9ca3af;">
-                <div style="font-size:2rem; margin-bottom:10px;">💬</div>
-                <div>Ask questions about your SAP O2C data</div>
-                <div style="font-size:0.8rem; margin-top:5px;">Try: "Show all customers" or "Find unpaid invoices"</div>
+    label = detail.get('label', 'Node')
+    props = detail.get("properties", {})
+    neighbors = detail.get("neighbors", [])
+    
+    st.markdown(f"""
+    <div class="node-detail-card">
+        <div class="node-detail-header">{label}</div>
+        <div class="node-detail-entity">Entity: {label}</div>
+    """, unsafe_allow_html=True)
+    
+    # Show all properties
+    for key, value in props.items():
+        if value is not None and value != "":
+            display_value = str(value)
+            if len(display_value) > 50:
+                display_value = display_value[:50] + "..."
+            st.markdown(f"""
+            <div class="node-detail-row">
+                <span class="node-detail-key">{key}:</span>
+                <span class="node-detail-value">{display_value}</span>
             </div>
             """, unsafe_allow_html=True)
-        else:
-            # Render existing messages
-            for msg in st.session_state.messages:
-                if msg["role"] == "user":
-                    st.markdown(f'''
-                    <div class="message-user">
-                        <div class="message-user-bubble">{msg["content"]}</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'''
-                    <div class="message-assistant">
-                        <div class="message-assistant-bubble">{msg["content"]}</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                    if msg.get("cypher"):
-                        with st.expander("View Cypher query"):
-                            st.code(msg["cypher"], language="cypher")
-            
-            # Handle streaming response
-            if st.session_state.get("streaming_active"):
-                process_streaming_response()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
     
-    # Input
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        user_input = st.text_input(
-            "Message",
-            placeholder="Ask about orders, deliveries, invoices, payments...",
-            key="chat_input",
-            label_visibility="collapsed",
-            disabled=st.session_state.get("streaming_active", False),
-        )
-    with col2:
-        send_disabled = st.session_state.get("streaming_active", False)
-        if st.button("Send", type="primary", use_container_width=True, disabled=send_disabled):
-            if user_input:
-                send_message(user_input)
+    # Show connections count
+    if neighbors:
+        st.markdown(f"""
+        <div class="node-detail-footer">Connections: {len(neighbors)}</div>
+        """, unsafe_allow_html=True)
     
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Expand and navigate buttons
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Clear chat", use_container_width=True):
-            st.session_state.messages = []
-            st.session_state.highlighted_nodes = []
-            st.session_state.streaming_active = False
-            st.rerun()
-    with col2:
-        if st.session_state.highlighted_nodes:
-            st.markdown(f"<small>🔴 {len(st.session_state.highlighted_nodes)} nodes in graph</small>", unsafe_allow_html=True)
+        if st.button("🔍 Expand", key="expand_node", use_container_width=True):
+            expansion = expand_node_api(node_id)
+            if expansion.get("nodes"):
+                existing = {n["id"] for n in st.session_state.graph_data.get("nodes", [])}
+                for new in expansion["nodes"]:
+                    if new["id"] not in existing:
+                        st.session_state.graph_data["nodes"].append(new)
+                st.session_state.graph_data["edges"].extend(expansion.get("edges", []))
+                st.rerun()
     
-    # Show highlighted nodes as clickable list
-    if st.session_state.highlighted_nodes:
-        with st.expander(f"📍 View highlighted nodes ({len(st.session_state.highlighted_nodes)})"):
-            for node_id in st.session_state.highlighted_nodes[:10]:
-                parts = node_id.split("_", 1)
-                label = parts[0] if len(parts) > 1 else "Node"
-                display_id = parts[1] if len(parts) > 1 else node_id
-                if st.button(f"{label}: {display_id}", key=f"hl_{node_id}"):
-                    st.session_state.selected_node = node_id
+    with col2:
+        if st.button("✕ Close", key="close_detail", use_container_width=True):
+            st.session_state.selected_node = None
+            st.rerun()
+    
+    # Show connected nodes
+    if neighbors:
+        with st.expander(f"Connected Nodes ({len(neighbors)})", expanded=False):
+            for n in neighbors[:8]:
+                dir_icon = "→" if n["direction"] == "outgoing" else "←"
+                btn_label = f"{dir_icon} {n['relationship']}: {n['name'][:20]}"
+                if st.button(btn_label, key=f"nav_{n['id']}", use_container_width=True):
+                    st.session_state.selected_node = n["id"]
                     st.rerun()
-            if len(st.session_state.highlighted_nodes) > 10:
-                st.caption(f"...and {len(st.session_state.highlighted_nodes) - 10} more")
 
 
-def send_message(message: str, use_streaming: bool = True):
+def send_message(message: str):
+    """Send a message and get response."""
     st.session_state.messages.append({"role": "user", "content": message})
     
     history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[-6:]]
     
-    if use_streaming:
-        # Use streaming endpoint for real-time response
-        st.session_state.streaming_active = True
-        st.session_state.streaming_message = message
-        st.session_state.streaming_history = history[:-1]
-    else:
-        # Fallback to simple endpoint
-        with st.spinner(""):
-            response = chat_simple(message, history[:-1])
-        
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": response.get("answer", "No response"),
-            "cypher": response.get("cypher_query"),
-        })
-        st.session_state.highlighted_nodes = response.get("highlighted_nodes", [])
+    with st.spinner(""):
+        response = chat_simple(message, history[:-1])
+    
+    answer = response.get("answer", "No response")
+    cypher = response.get("cypher_query")
+    highlighted = response.get("highlighted_nodes", [])
+    
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": answer,
+        "cypher": cypher,
+    })
+    
+    # Update highlighted nodes and refresh graph to show them
+    st.session_state.highlighted_nodes = highlighted
+    
+    # If we have highlighted nodes, add them to the graph if not present
+    if highlighted:
+        existing_ids = {n["id"] for n in st.session_state.graph_data.get("nodes", [])}
+        for node_id in highlighted[:20]:  # Limit to first 20
+            if node_id not in existing_ids:
+                # Fetch and add the node
+                parts = node_id.split("_", 1)
+                label = parts[0] if len(parts) > 1 else "Node"
+                name = parts[1] if len(parts) > 1 else node_id
+                st.session_state.graph_data["nodes"].append({
+                    "id": node_id,
+                    "label": label,
+                    "name": name,
+                })
     
     st.rerun()
 
 
-def process_streaming_response():
-    """Process a streaming response and update the UI in real-time."""
-    if not st.session_state.get("streaming_active"):
-        return
-    
-    message = st.session_state.streaming_message
-    history = st.session_state.streaming_history
-    
-    # Create placeholder for streaming content
-    response_placeholder = st.empty()
-    cypher_query = None
-    highlighted_nodes = []
-    full_response = ""
-    
-    with response_placeholder.container():
-        st.markdown("""
-        <div class="message-assistant">
-            <div class="message-assistant-bubble">
-                <span class="streaming-indicator">Thinking...</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    for event_type, content in chat_streaming(message, history):
-        if event_type == "cypher":
-            cypher_query = content
-        elif event_type == "highlights":
-            highlighted_nodes = content if isinstance(content, list) else []
-        elif event_type == "text":
-            full_response += content
-            with response_placeholder.container():
-                st.markdown(f'''
-                <div class="message-assistant">
-                    <div class="message-assistant-bubble">{full_response}<span class="streaming-cursor">▌</span></div>
-                </div>
-                ''', unsafe_allow_html=True)
-        elif event_type == "error":
-            full_response = content
-            break
-        elif event_type == "done":
-            break
-    
-    # Clear streaming state
-    st.session_state.streaming_active = False
-    st.session_state.streaming_message = None
-    st.session_state.streaming_history = None
-    
-    # Add final message to history
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": full_response or "No response received",
-        "cypher": cypher_query,
-    })
-    st.session_state.highlighted_nodes = highlighted_nodes
-    
-    # Final render without cursor
-    with response_placeholder.container():
-        st.markdown(f'''
-        <div class="message-assistant">
-            <div class="message-assistant-bubble">{full_response}</div>
-        </div>
-        ''', unsafe_allow_html=True)
-        if cypher_query:
-            with st.expander("View Cypher query"):
-                st.code(cypher_query, language="cypher")
-
-
 def main():
     init_session_state()
-    render_header()
     
     # Health check
     health = check_api_health()
@@ -820,17 +667,177 @@ def main():
         st.error(f"Backend unavailable: {health.get('message')}")
         st.code("cd backend && uvicorn app.main:app --reload")
         return
-    if health.get("neo4j") != "connected":
-        st.warning(f"Neo4j: {health.get('neo4j')}")
     
-    # Main layout: Graph (left 60%) | Chat (right 40%)
-    graph_col, chat_col = st.columns([3, 2], gap="large")
+    # Top navigation
+    st.markdown("""
+    <div class="top-nav">
+        <span class="nav-title">🔗 Mapping / <strong>Order to Cash</strong></span>
+    </div>
+    """, unsafe_allow_html=True)
     
+    # Legend
+    render_legend()
+    
+    # Main layout
+    graph_col, chat_col = st.columns([2, 1], gap="small")
+    
+    # Graph Panel
     with graph_col:
-        render_graph_panel()
+        # Graph controls
+        ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns([1, 1, 1, 3])
+        with ctrl_col1:
+            if st.button("↻ Reload", use_container_width=True):
+                st.session_state.graph_data = fetch_graph_overview()
+                st.session_state.highlighted_nodes = []
+                st.rerun()
+        with ctrl_col2:
+            if st.button("✕ Clear", use_container_width=True):
+                st.session_state.selected_node = None
+                st.session_state.highlighted_nodes = []
+                st.rerun()
+        with ctrl_col3:
+            minimize = st.checkbox("Minimize", value=False)
+        with ctrl_col4:
+            search_query = st.text_input("Search", placeholder="Search nodes...", label_visibility="collapsed")
+        
+        # Search results
+        if search_query and len(search_query) >= 2:
+            results = search_nodes(search_query)
+            if results:
+                st.markdown("**Search Results:**")
+                for r in results[:5]:
+                    if st.button(f"→ {r['name'][:30]} ({r['label']})", key=f"search_{r['id']}"):
+                        st.session_state.selected_node = r["id"]
+                        st.session_state.highlighted_nodes = [r["id"]]
+                        st.rerun()
+        
+        # Load graph data if empty
+        if not st.session_state.graph_data.get("nodes"):
+            with st.spinner("Loading graph..."):
+                st.session_state.graph_data = fetch_graph_overview()
+        
+        # Render graph
+        if not minimize and st.session_state.graph_data.get("nodes"):
+            nodes, edges = build_agraph_data(
+                st.session_state.graph_data, 
+                st.session_state.highlighted_nodes
+            )
+            
+            config = Config(
+                width="100%",
+                height=550,
+                directed=True,
+                physics=True,
+                hierarchical=False,
+                nodeHighlightBehavior=True,
+                highlightColor="#dc2626",
+                collapsible=False,
+            )
+            
+            selected = agraph(nodes=nodes, edges=edges, config=config)
+            
+            if selected and selected != st.session_state.selected_node:
+                st.session_state.selected_node = selected
+                st.rerun()
+        
+        # Show node detail if selected
+        if st.session_state.selected_node:
+            render_node_detail_popup(st.session_state.selected_node)
+        
+        # Show highlighted nodes info
+        if st.session_state.highlighted_nodes:
+            with st.expander(f"📍 Highlighted Nodes ({len(st.session_state.highlighted_nodes)})", expanded=False):
+                for node_id in st.session_state.highlighted_nodes[:15]:
+                    parts = node_id.split("_", 1)
+                    label = parts[0] if len(parts) > 1 else "Node"
+                    display_id = parts[1] if len(parts) > 1 else node_id
+                    if st.button(f"{label}: {display_id}", key=f"hl_{node_id}"):
+                        st.session_state.selected_node = node_id
+                        st.rerun()
     
+    # Chat Panel
     with chat_col:
-        render_chat_panel()
+        # Chat header
+        st.markdown("""
+        <div class="chat-header">
+            <div class="chat-header-title">Chat with Graph</div>
+            <div class="chat-header-title" style="font-size: 0.75rem; color: #94a3b8;">Order to Cash</div>
+            <div class="chat-agent">
+                <div class="chat-agent-avatar">D</div>
+                <div>
+                    <div class="chat-agent-name">Dodge AI</div>
+                    <div class="chat-agent-role">Graph Agent</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Chat messages
+        chat_container = st.container(height=400)
+        with chat_container:
+            for msg in st.session_state.messages:
+                if msg["role"] == "user":
+                    st.markdown(f"""
+                    <div class="chat-message chat-message-user">
+                        <div class="bubble">{msg["content"]}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    content = msg["content"].replace("\n", "<br>")
+                    st.markdown(f"""
+                    <div class="chat-message chat-message-assistant">
+                        <div class="avatar">D</div>
+                        <div class="bubble">{content}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Show Cypher query if available
+                    if msg.get("cypher"):
+                        with st.expander("View Cypher Query", expanded=False):
+                            st.code(msg["cypher"], language="cypher")
+        
+        # Chat input
+        st.markdown("""
+        <div class="chat-status">
+            <span class="chat-status-dot"></span>
+            Dodge AI is awaiting instructions
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            user_input = st.text_input(
+                "Message",
+                placeholder="Analyze anything",
+                key="chat_input",
+                label_visibility="collapsed",
+            )
+        with col2:
+            if st.button("Send", type="primary", use_container_width=True):
+                if user_input:
+                    send_message(user_input)
+        
+        # Quick actions
+        with st.expander("💡 Example Queries", expanded=False):
+            examples = [
+                "Show all customers with their orders",
+                "Which orders are not delivered?",
+                "Trace complete O2C flows",
+                "Find broken/incomplete flows",
+                "Top products by billing count",
+                "Show cancelled invoices",
+            ]
+            for ex in examples:
+                if st.button(ex, key=f"ex_{ex[:20]}", use_container_width=True):
+                    send_message(ex)
+        
+        # Clear chat button
+        if st.button("Clear Chat", use_container_width=True):
+            st.session_state.messages = [
+                {"role": "assistant", "content": "Hi! I can help you analyze the **Order to Cash** process."}
+            ]
+            st.session_state.highlighted_nodes = []
+            st.rerun()
 
 
 if __name__ == "__main__":
