@@ -1,0 +1,35 @@
+# Render Blueprint for Dodge AI
+# Deploy with: render blueprint apply
+
+services:
+  # Backend API
+  - type: web
+    name: dodge-ai-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: NEO4J_URI
+        sync: false
+      - key: NEO4J_USER
+        value: neo4j
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: '["*"]'
+
+  # Frontend (Streamlit)
+  - type: web
+    name: dodge-ai-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    envVars:
+      - key: API_BASE
+        fromService:
+          name: dodge-ai-backend
+          type: web
+          property: host
