@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  cypher?: string | null;
-}
+import type { Message } from "@/types";
 
 interface ChatPanelProps {
   messages: Message[];
@@ -17,10 +12,94 @@ interface ChatPanelProps {
 
 const SUGGESTED_QUESTIONS = [
   "Show top products by billing count",
-  "Trace billing flow for document 9150187",
   "Find orders delivered but not billed",
   "Which customer has most sales orders?",
 ];
+
+/** Render inline markdown: **bold** */
+function renderInline(text: string) {
+  return text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+/** Parse a pipe-delimited row into cells, stripping leading/trailing pipes. */
+function parseRow(row: string) {
+  return row.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+}
+
+/** Full markdown renderer: tables + bold + paragraphs. */
+function renderContent(content: string) {
+  // The backend sometimes returns inline pipes without newlines.
+  // Re-insert newlines before every | that starts a new row.
+  const normalised = content
+    .replace(/\| \|/g, "|\n|")
+    .replace(/\|\s*\n\s*\|/g, "|\n|");
+
+  const lines = normalised.split("\n");
+  const blocks: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i].trim();
+
+    if (line.startsWith("|") && line.endsWith("|")) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        tableLines.push(lines[i].trim());
+        i++;
+      }
+
+      const headerRow = tableLines[0];
+      const hasSep = tableLines.length > 1 && /^[\|\-\s:]+$/.test(tableLines[1]);
+      const dataRows = hasSep ? tableLines.slice(2) : tableLines.slice(1);
+
+      blocks.push(
+        <div key={`tbl-${blocks.length}`} className="my-3 overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+          <table className="w-full text-sm text-left border-collapse">
+            {hasSep && (
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  {parseRow(headerRow).map((cell, ci) => (
+                    <th key={ci} className="px-4 py-2.5 text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">
+                      {renderInline(cell)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {dataRows.map((row, ri) => (
+                <tr key={ri} className={`border-b border-gray-100 last:border-0 ${ri % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
+                  {parseRow(row).map((cell, ci) => (
+                    <td key={ci} className="px-4 py-2.5 text-[13.5px] text-gray-700 whitespace-nowrap">
+                      {renderInline(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    if (line !== "") {
+      blocks.push(
+        <p key={`p-${blocks.length}`} className="text-[15px] leading-[1.75] text-gray-800 break-words mb-1">
+          {renderInline(line)}
+        </p>
+      );
+    }
+    i++;
+  }
+
+  return blocks;
+}
 
 export default function ChatPanel({ messages, onSendMessage, onStop, isLoading }: ChatPanelProps) {
   const [input, setInput] = useState("");
@@ -53,94 +132,6 @@ export default function ChatPanel({ messages, onSendMessage, onStop, isLoading }
       e.preventDefault();
       handleSubmit();
     }
-  };
-
-  /** Render inline markdown: **bold** */
-  const renderInline = (text: string) =>
-    text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        return <strong key={i} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
-      }
-      return <span key={i}>{part}</span>;
-    });
-
-  /** Parse a pipe-delimited row into cells, stripping leading/trailing pipes */
-  const parseRow = (row: string) =>
-    row.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
-
-  /** Full markdown renderer: tables + bold + paragraphs */
-  const renderContent = (content: string) => {
-    // Normalise the response: the backend sometimes returns inline pipes with
-    // no real newlines. Re-insert newlines before every | that starts a new row.
-    const normalised = content
-      .replace(/\| \|/g, "|\n|")          // "| |" → newline between rows
-      .replace(/\|\s*\n\s*\|/g, "|\n|");  // already has newlines — clean up
-
-    const lines = normalised.split("\n");
-    const blocks: React.ReactNode[] = [];
-    let i = 0;
-
-    while (i < lines.length) {
-      const line = lines[i].trim();
-
-      // ── Table block: line starts and ends with | ──
-      if (line.startsWith("|") && line.endsWith("|")) {
-        const tableLines: string[] = [];
-        while (i < lines.length && lines[i].trim().startsWith("|")) {
-          tableLines.push(lines[i].trim());
-          i++;
-        }
-
-        // Separate header, separator, and data rows
-        const headerRow = tableLines[0];
-        const isSep = (r: string) => /^\|[\s\-:|]+\|$/.test(r.replace(/\|[-:\s]+/g, "|x|").replace(/\|x\|/g, "|"));
-        const hasSep = tableLines.length > 1 && /^[\|\-\s:]+$/.test(tableLines[1]);
-        const dataRows = hasSep ? tableLines.slice(2) : tableLines.slice(1);
-        void isSep;
-
-        blocks.push(
-          <div key={`tbl-${blocks.length}`} className="my-3 overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-            <table className="w-full text-sm text-left border-collapse">
-              {hasSep && (
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    {parseRow(headerRow).map((cell, ci) => (
-                      <th key={ci} className="px-4 py-2.5 text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">
-                        {renderInline(cell)}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-              )}
-              <tbody>
-                {dataRows.map((row, ri) => (
-                  <tr key={ri} className={`border-b border-gray-100 last:border-0 ${ri % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
-                    {parseRow(row).map((cell, ci) => (
-                      <td key={ci} className="px-4 py-2.5 text-[13.5px] text-gray-700 whitespace-nowrap">
-                        {renderInline(cell)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-        continue;
-      }
-
-      // ── Regular text line ──
-      if (line !== "") {
-        blocks.push(
-          <p key={`p-${blocks.length}`} className="text-[15px] leading-[1.75] text-gray-800 break-words mb-1">
-            {renderInline(line)}
-          </p>
-        );
-      }
-      i++;
-    }
-
-    return blocks;
   };
 
   const showSuggestions = messages.length <= 1 && !isLoading;

@@ -53,16 +53,11 @@ def is_query_relevant(query: str) -> tuple[bool, str | None]:
     for kw in DOMAIN_KEYWORDS:
         if kw in query_lower:
             return True, None
-    
+
     # Short queries with numbers might be IDs (e.g., "740506", "SO-123")
     if len(query.split()) <= 3 and any(c.isdigit() for c in query):
         return True, None
-    
-    # Queries asking about specific entities
-    entity_patterns = ["customer", "order", "delivery", "invoice", "billing", "payment", "material", "plant"]
-    if any(ep in query_lower for ep in entity_patterns):
-        return True, None
-    
+
     # Default: reject queries without domain context
     return False, OFF_TOPIC_RESPONSE
 

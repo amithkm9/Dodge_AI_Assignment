@@ -12,17 +12,12 @@ import {
   GraphNode,
   GraphEdge,
 } from "@/lib/api";
+import type { Message } from "@/types";
 
 const GraphVisualization = dynamic(
   () => import("@/components/GraphVisualization"),
   { ssr: false }
 );
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  cypher?: string | null;
-}
 
 export default function Home() {
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -193,16 +188,16 @@ export default function Home() {
     ]);
   }, []);
 
-  const handleMinimize = () => {
-    setIsMinimized(!isMinimized);
-  };
+  const handleMinimize = useCallback(() => {
+    setIsMinimized((prev) => !prev);
+  }, []);
 
-  const handleToggleOverlay = () => {
-    setShowOverlay(!showOverlay);
-  };
+  const handleToggleOverlay = useCallback(() => {
+    setShowOverlay((prev) => !prev);
+  }, []);
 
-  const handleToggleChat = () => {
-    setIsChatCollapsed(!isChatCollapsed);
+  const handleToggleChat = useCallback(() => {
+    setIsChatCollapsed((prev) => !prev);
     setTimeout(() => {
       const container = document.getElementById("graph-container");
       if (container) {
@@ -212,7 +207,7 @@ export default function Home() {
         });
       }
     }, 300);
-  };
+  }, []);
 
   const handleToggleFocusMode = useCallback(() => {
     setFocusMode((prev) => !prev);

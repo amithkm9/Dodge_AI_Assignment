@@ -120,25 +120,9 @@ class LLMService:
         if not results:
             return "No matching data was found for your query."
 
-        # Truncate results for the prompt
-        results_str = str(results[:50])
-        if len(results_str) > 3000:
-            results_str = results_str[:3000] + "... (truncated)"
-
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a helpful business data analyst. Given a user question, the Cypher query that was executed, and the raw results, provide a clear, concise natural language answer. Format numbers nicely. Use tables for tabular data (markdown). Be factual - only state what the data shows.",
-            },
-            {
-                "role": "user",
-                "content": f"Question: {question}\n\nCypher Query: {cypher}\n\nResults ({len(results)} rows):\n{results_str}\n\nProvide a clear answer:",
-            },
-        ]
-
         response = self.client.chat.completions.create(
             model=settings.openai_model,
-            messages=messages,
+            messages=self._build_analyst_messages(question, cypher, results),
             temperature=0.2,
             max_tokens=1000,
         )
@@ -150,24 +134,9 @@ class LLMService:
             yield "No matching data was found for your query."
             return
 
-        results_str = str(results[:50])
-        if len(results_str) > 3000:
-            results_str = results_str[:3000] + "... (truncated)"
-
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a helpful business data analyst. Given a user question, the Cypher query that was executed, and the raw results, provide a clear, concise natural language answer. Format numbers nicely. Use tables for tabular data (markdown). Be factual - only state what the data shows.",
-            },
-            {
-                "role": "user",
-                "content": f"Question: {question}\n\nCypher Query: {cypher}\n\nResults ({len(results)} rows):\n{results_str}\n\nProvide a clear answer:",
-            },
-        ]
-
         stream = self.client.chat.completions.create(
             model=settings.openai_model,
-            messages=messages,
+            messages=self._build_analyst_messages(question, cypher, results),
             temperature=0.2,
             max_tokens=1000,
             stream=True,
@@ -175,6 +144,33 @@ class LLMService:
         for chunk in stream:
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
+
+    def _build_analyst_messages(self, question: str, cypher: str, results: list[dict]) -> list[dict]:
+        """Build the messages list for the analyst response step."""
+        results_str = str(results[:50])
+        if len(results_str) > 3000:
+            results_str = results_str[:3000] + "... (truncated)"
+
+        return [
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful business data analyst. Given a user question, "
+                    "the Cypher query that was executed, and the raw results, provide a "
+                    "clear, concise natural language answer. Format numbers nicely. "
+                    "Use tables for tabular data (markdown). Be factual — only state what the data shows."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Question: {question}\n\n"
+                    f"Cypher Query: {cypher}\n\n"
+                    f"Results ({len(results)} rows):\n{results_str}\n\n"
+                    "Provide a clear answer:"
+                ),
+            },
+        ]
 
     def classify_relevance(self, question: str) -> bool:
         """Layer 2: LLM-based relevance classification."""

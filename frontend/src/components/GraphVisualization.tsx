@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import dynamic from "next/dynamic";
+import type { ForceGraphMethods } from "react-force-graph-2d";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
   ssr: false,
@@ -68,14 +69,14 @@ const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizati
     { nodes, edges, highlightedNodes, onNodeClick, width, height, focusMode = false },
     ref
   ) {
-  const fgRef = useRef<any>(null);
-  const [graphData, setGraphData] = useState<{ nodes: any[]; links: any[] }>({
+  const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
+  const [graphData, setGraphData] = useState<{ nodes: Record<string, unknown>[]; links: Record<string, unknown>[] }>({
     nodes: [],
     links: [],
   });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  const highlightSet = new Set(highlightedNodes);
+  const highlightSet = useMemo(() => new Set(highlightedNodes), [highlightedNodes]);
 
   useImperativeHandle(ref, () => ({
     zoomToFit: () => {
@@ -216,35 +217,33 @@ const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizati
 
   return (
     <div className="w-full h-full relative overflow-hidden">
-      {typeof window !== "undefined" && (
-        <ForceGraph2D
-          ref={fgRef}
-          graphData={graphData}
-          width={width}
-          height={height}
-          nodeCanvasObject={nodeCanvasObject}
-          nodePointerAreaPaint={(node: any, color, ctx) => {
-            ctx.beginPath();
-            ctx.arc(node.x, node.y, (node.size || 4) + 5, 0, 2 * Math.PI);
-            ctx.fillStyle = color;
-            ctx.fill();
-          }}
-          onNodeClick={handleNodeClick}
-          onNodeHover={handleNodeHover}
-          linkCanvasObject={linkCanvasObject}
-          linkDirectionalArrowLength={0}
-          d3AlphaDecay={0.02}
-          d3VelocityDecay={0.3}
-          cooldownTicks={200}
-          onEngineStop={() => fgRef.current?.zoomToFit(400, 100)}
-          enableNodeDrag={true}
-          enableZoomInteraction={true}
-          enablePanInteraction={true}
-          backgroundColor="transparent"
-          minZoom={0.3}
-          maxZoom={8}
-        />
-      )}
+      <ForceGraph2D
+        ref={fgRef}
+        graphData={graphData}
+        width={width}
+        height={height}
+        nodeCanvasObject={nodeCanvasObject}
+        nodePointerAreaPaint={(node: Record<string, unknown>, color: string, ctx: CanvasRenderingContext2D) => {
+          ctx.beginPath();
+          ctx.arc(node.x as number, node.y as number, ((node.size as number) || 4) + 5, 0, 2 * Math.PI);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }}
+        onNodeClick={handleNodeClick}
+        onNodeHover={handleNodeHover}
+        linkCanvasObject={linkCanvasObject}
+        linkDirectionalArrowLength={0}
+        d3AlphaDecay={0.02}
+        d3VelocityDecay={0.3}
+        cooldownTicks={200}
+        onEngineStop={() => fgRef.current?.zoomToFit(400, 100)}
+        enableNodeDrag={true}
+        enableZoomInteraction={true}
+        enablePanInteraction={true}
+        backgroundColor="transparent"
+        minZoom={0.3}
+        maxZoom={8}
+      />
 
       <div className="absolute bottom-4 left-4 flex items-center gap-3 bg-white/90 backdrop-blur-sm px-4 py-2.5 rounded-lg shadow-sm border border-slate-200/50">
         {focusMode && (

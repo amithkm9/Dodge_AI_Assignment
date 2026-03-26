@@ -1,10 +1,13 @@
 import json
+import logging
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from app.models.schemas import ChatRequest
 from app.services.neo4j_service import neo4j_service
 from app.services.llm_service import llm_service
 from app.services.guardrails import is_query_relevant, validate_cypher
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -75,18 +78,14 @@ async def chat_simple(request: ChatRequest):
     """Non-streaming chat endpoint for simpler clients."""
     question = request.message
 
-    # Layer 1: Fast keyword check - if clearly off-topic, reject immediately
     relevant, rejection = is_query_relevant(question)
     if not relevant:
-        # Layer 2: LLM classification as second opinion (but trust Layer 1 more)
+        # Layer 2: LLM classification as a second opinion, but Layer 1 always wins
         try:
             if not llm_service.classify_relevance(question):
                 return {"answer": rejection, "cypher_query": None, "raw_results": None, "highlighted_nodes": []}
-            # Even if LLM says relevant, if Layer 1 strongly rejected, still reject
-            # (LLM can be fooled by creative phrasing)
         except Exception:
-            pass
-        # If we get here, Layer 1 said no but LLM said yes - still reject for safety
+            logger.warning("LLM relevance classification failed; defaulting to Layer 1 rejection")
         return {"answer": rejection, "cypher_query": None, "raw_results": None, "highlighted_nodes": []}
 
     try:
@@ -106,7 +105,8 @@ async def chat_simple(request: ChatRequest):
             "highlighted_nodes": highlighted,
         }
     except Exception as e:
-        return {"answer": f"Error: {str(e)}", "cypher_query": None, "raw_results": None, "highlighted_nodes": []}
+        logger.exception("Unhandled error in chat_simple")
+        return {"answer": f"An error occurred: {str(e)}", "cypher_query": None, "raw_results": None, "highlighted_nodes": []}
 
 
 def _extract_node_ids(results: list[dict]) -> list[str]:
