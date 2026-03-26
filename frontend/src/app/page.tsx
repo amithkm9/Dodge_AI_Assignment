@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import ChatPanel from "@/components/ChatPanel";
 import NodePopup from "@/components/NodePopup";
@@ -47,6 +47,8 @@ export default function Home() {
   const [showOverlay, setShowOverlay] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const graphRef = useRef<{ zoomToFit: () => void } | null>(null);
 
   useEffect(() => {
     checkHealth()
@@ -154,6 +156,15 @@ export default function Home() {
           if (newNodes.length > 0) {
             setNodes((prev) => [...prev, ...newNodes]);
           }
+
+          if (response.highlighted_nodes.length <= 20) {
+            setFocusMode(true);
+            setTimeout(() => {
+              graphRef.current?.zoomToFit();
+            }, 500);
+          }
+        } else {
+          setFocusMode(false);
         }
       } catch (err) {
         if ((err as { name?: string }).name !== "AbortError") {
@@ -202,6 +213,32 @@ export default function Home() {
       }
     }, 300);
   };
+
+  const handleToggleFocusMode = useCallback(() => {
+    setFocusMode((prev) => !prev);
+    setTimeout(() => {
+      graphRef.current?.zoomToFit();
+    }, 100);
+  }, []);
+
+  const handleClearFocus = useCallback(() => {
+    setHighlightedNodes([]);
+    setFocusMode(false);
+  }, []);
+
+  const focusedNodes = useMemo(() => {
+    if (!focusMode || highlightedNodes.length === 0) return nodes;
+    const highlightSet = new Set(highlightedNodes);
+    return nodes.filter((n) => highlightSet.has(n.id));
+  }, [nodes, highlightedNodes, focusMode]);
+
+  const focusedEdges = useMemo(() => {
+    if (!focusMode || highlightedNodes.length === 0) return edges;
+    const highlightSet = new Set(highlightedNodes);
+    return edges.filter(
+      (e) => highlightSet.has(e.source) && highlightSet.has(e.target)
+    );
+  }, [edges, highlightedNodes, focusMode]);
 
   if (!isHealthy) {
     return (
@@ -302,6 +339,38 @@ export default function Home() {
               </svg>
               {showOverlay ? "Hide" : "Show"} Granular Overlay
             </button>
+            {highlightedNodes.length > 0 && (
+              <>
+                <button
+                  onClick={handleToggleFocusMode}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-sm ${
+                    focusMode
+                      ? "bg-red-500 text-white shadow-md"
+                      : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                  }`}
+                  title={focusMode ? "Show full graph" : "Focus on query results"}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {focusMode ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                    )}
+                  </svg>
+                  {focusMode ? "Show All" : "Focus Mode"}
+                </button>
+                <button
+                  onClick={handleClearFocus}
+                  className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-sm bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                  title="Clear highlights"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear
+                </button>
+              </>
+            )}
           </div>
 
           {/* Graph Container */}
@@ -312,12 +381,14 @@ export default function Home() {
           >
             {!isMinimized && (
               <GraphVisualization
-                nodes={nodes}
-                edges={edges}
+                ref={graphRef}
+                nodes={focusedNodes}
+                edges={focusedEdges}
                 highlightedNodes={highlightedNodes}
                 onNodeClick={handleNodeClick}
                 width={graphDimensions.width}
                 height={graphDimensions.height}
+                focusMode={focusMode}
               />
             )}
 

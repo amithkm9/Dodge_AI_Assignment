@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import dynamic from "next/dynamic";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
@@ -26,6 +26,11 @@ interface GraphVisualizationProps {
   onNodeClick: (nodeId: string, position: { x: number; y: number }) => void;
   width: number;
   height: number;
+  focusMode?: boolean;
+}
+
+export interface GraphVisualizationHandle {
+  zoomToFit: () => void;
 }
 
 const NODE_COLORS: Record<string, string> = {
@@ -58,14 +63,11 @@ const NODE_SIZES: Record<string, number> = {
   Address: 4,
 };
 
-export default function GraphVisualization({
-  nodes,
-  edges,
-  highlightedNodes,
-  onNodeClick,
-  width,
-  height,
-}: GraphVisualizationProps) {
+const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizationProps>(
+  function GraphVisualization(
+    { nodes, edges, highlightedNodes, onNodeClick, width, height, focusMode = false },
+    ref
+  ) {
   const fgRef = useRef<any>(null);
   const [graphData, setGraphData] = useState<{ nodes: any[]; links: any[] }>({
     nodes: [],
@@ -74,6 +76,22 @@ export default function GraphVisualization({
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   const highlightSet = new Set(highlightedNodes);
+
+  useImperativeHandle(ref, () => ({
+    zoomToFit: () => {
+      if (fgRef.current) {
+        fgRef.current.zoomToFit(400, 50);
+      }
+    },
+  }));
+
+  useEffect(() => {
+    if (focusMode && fgRef.current) {
+      setTimeout(() => {
+        fgRef.current?.zoomToFit(400, 50);
+      }, 300);
+    }
+  }, [focusMode, nodes.length]);
 
   useEffect(() => {
     const processedNodes = nodes.map((node) => ({
@@ -229,6 +247,15 @@ export default function GraphVisualization({
       )}
 
       <div className="absolute bottom-4 left-4 flex items-center gap-3 bg-white/90 backdrop-blur-sm px-4 py-2.5 rounded-lg shadow-sm border border-slate-200/50">
+        {focusMode && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+              <span className="text-xs text-red-600 font-semibold">Focus Mode</span>
+            </div>
+            <div className="w-px h-3 bg-slate-300"></div>
+          </>
+        )}
         <div className="flex items-center gap-1.5">
           <div className="w-2 h-2 rounded-full bg-blue-500"></div>
           <span className="text-xs text-slate-600 font-medium">{nodes.length} nodes</span>
@@ -241,4 +268,6 @@ export default function GraphVisualization({
       </div>
     </div>
   );
-}
+});
+
+export default GraphVisualization;

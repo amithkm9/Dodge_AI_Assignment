@@ -21,6 +21,7 @@ IMPORTANT RULES:
 12. CRITICAL: If the user asks a generic question like "trace a flow" or "show a billing document" WITHOUT specifying an ID, return SAMPLE data by NOT filtering on a specific ID. Show multiple examples instead.
 13. NEVER use placeholder values like 'YOUR_ID_HERE' or 'GIVEN_ID'. Either use a specific ID if provided, or return sample data.
 14. ALWAYS include entity IDs in the RETURN clause for graph highlighting: c.businessPartner AS customerId, so.salesOrder, d.deliveryDocument AS delivery, b.billingDocument, j.accountingDocument AS journalEntry, p.accountingDocument AS payment, m.product AS material.
+15. DATE HANDLING: Dates are stored as strings in format 'YYYY-MM-DD'. For date comparisons, use string comparison or filter by specific date patterns. For "recent" or "last month" queries, just order by date DESC and limit results. Do NOT use date() function arithmetic like date().add() - it's not supported.
 
 FEW-SHOT EXAMPLES:
 
@@ -59,6 +60,18 @@ CYPHER: MATCH (b:BillingDocument) WHERE NOT EXISTS {{ MATCH (d:Delivery)-[:BILLE
 
 Q: "Top products by billing count"
 CYPHER: MATCH (bi:BillingItem) MATCH (bi)-[:BILLS_ITEM]->(di:DeliveryItem)-[:FULFILLS_ITEM]->(soi:SalesOrderItem)-[:REFERENCES_MATERIAL]->(m:Material) RETURN m.product AS material, m.productDescription AS description, count(bi) AS billingItemCount ORDER BY billingItemCount DESC LIMIT 10
+
+Q: "Find payments that cleared recently" or "Show recent payments"
+CYPHER: MATCH (p:Payment) WHERE p.clearingDate IS NOT NULL RETURN p.accountingDocument AS payment, p.clearingDate AS clearingDate, p.amountInTransactionCurrency AS amount, p.transactionCurrency AS currency, p.customer AS customerId ORDER BY p.clearingDate DESC LIMIT 25
+
+Q: "Show orders created in the last month" or "Recent orders"
+CYPHER: MATCH (so:SalesOrder) RETURN so.salesOrder, so.soldToParty AS customerId, so.totalNetAmount AS amount, so.creationDate AS date, so.overallDeliveryStatus AS status ORDER BY so.creationDate DESC LIMIT 25
+
+Q: "Find deliveries from March 2025"
+CYPHER: MATCH (d:Delivery) WHERE d.creationDate STARTS WITH '2025-03' RETURN d.deliveryDocument AS delivery, d.creationDate AS date, d.shippingPoint AS plant, d.overallGoodsMovementStatus AS status ORDER BY d.creationDate DESC LIMIT 25
+
+Q: "Show payments cleared in 2025"
+CYPHER: MATCH (p:Payment) WHERE p.clearingDate STARTS WITH '2025' RETURN p.accountingDocument AS payment, p.clearingDate AS clearingDate, p.amountInTransactionCurrency AS amount, p.customer AS customerId ORDER BY p.clearingDate DESC LIMIT 25
 """
 
 

@@ -11,6 +11,7 @@ A graph-based data modeling and query system that allows users to explore SAP Or
 ## Table of Contents
 
 - [Overview](#overview)
+- [Features](#features)
 - [Architecture](#architecture)
 - [Data Model](#data-model)
 - [LLM Prompting Strategy](#llm-prompting-strategy)
@@ -30,16 +31,40 @@ Dodge AI transforms fragmented SAP O2C transactional data into an interconnected
 - **Trace document flows** from sales order to payment
 - **Identify anomalies** like broken or incomplete business flows
 
-### Key Features
+---
+
+## Features
+
+### Core Features
 
 | Feature | Description |
 |---------|-------------|
-| **Interactive Graph** | Visual exploration with node expansion and relationship inspection |
+| **Interactive Graph** | Force-directed 2D graph visualization with node expansion and relationship inspection |
 | **NL → Cypher** | Natural language queries translated to Cypher in real-time |
-| **Streaming Responses** | LLM responses streamed for better UX |
-| **Node Highlighting** | Query results highlight relevant nodes in the graph |
-| **Conversation Memory** | Context maintained across multiple queries |
-| **Guardrails** | Off-topic queries rejected with helpful messages |
+| **Focus Mode** | Automatically filters graph to show only query-relevant nodes and edges |
+| **Node Highlighting** | Query results highlight relevant nodes in red with visual emphasis |
+| **Conversation Memory** | Context maintained across last 6 messages for follow-up queries |
+| **Guardrails** | Three-layer protection rejects off-topic queries with helpful messages |
+
+### Graph Visualization Features
+
+| Feature | Description |
+|---------|-------------|
+| **Node Expansion** | Click any node to see its properties and expand to neighbors |
+| **Color-Coded Entities** | 12 distinct colors for different entity types (Customer, Order, Delivery, etc.) |
+| **Focus Mode Toggle** | Filter graph to show only highlighted nodes from query results |
+| **Auto-Zoom** | Graph automatically zooms to fit focused nodes after query |
+| **Clear Highlights** | One-click button to clear all highlights and return to full graph |
+
+### Chat Interface Features
+
+| Feature | Description |
+|---------|-------------|
+| **Suggested Questions** | Pre-built queries to help users get started |
+| **Cypher Query Disclosure** | Expandable view to see the generated Cypher query |
+| **Markdown Tables** | Results displayed in formatted tables |
+| **Loading Indicators** | Visual feedback during query processing |
+| **Stop Generation** | Ability to cancel in-progress queries |
 
 ---
 
@@ -51,9 +76,9 @@ Dodge AI transforms fragmented SAP O2C transactional data into an interconnected
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │   ┌────────────────┐      ┌─────────────────┐      ┌─────────────────┐     │
-│   │   Streamlit    │      │    FastAPI      │      │     Neo4j       │     │
+│   │    Next.js     │      │    FastAPI      │      │     Neo4j       │     │
 │   │   Frontend     │─────▶│    Backend      │─────▶│   Graph DB      │     │
-│   │  (Port 8501)   │◀─────│  (Port 8000)    │◀─────│  (Port 7687)    │     │
+│   │  (Port 3000)   │◀─────│  (Port 8000)    │◀─────│  (Port 7687)    │     │
 │   └────────────────┘      └────────┬────────┘      └─────────────────┘     │
 │                                    │                                        │
 │                                    ▼                                        │
@@ -71,9 +96,10 @@ Dodge AI transforms fragmented SAP O2C transactional data into an interconnected
 |-----------|------------|-----------|
 | **Graph Database** | Neo4j | Native graph storage with Cypher query language; ideal for traversing O2C relationships |
 | **Backend** | FastAPI | Async support, automatic OpenAPI docs, Pydantic validation |
-| **Frontend** | Streamlit | Rapid prototyping, built-in components, easy deployment |
+| **Frontend** | Next.js 16 + React 19 | Modern React framework with App Router, server components |
+| **Graph Viz** | react-force-graph-2d | High-performance 2D force-directed graph on canvas |
+| **Styling** | Tailwind CSS v4 | Utility-first CSS for rapid UI development |
 | **LLM** | GPT-4o | Best-in-class for code generation (Cypher) with low latency |
-| **Graph Viz** | streamlit-agraph | Interactive graph visualization within Streamlit |
 
 ### Project Structure
 
@@ -99,8 +125,19 @@ dodge-ai/
 │   │       └── seed.py          # Neo4j database seeding
 │   └── requirements.txt
 ├── frontend/
-│   ├── streamlit_app.py         # Streamlit UI application
-│   └── requirements.txt
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── layout.tsx       # Root layout
+│   │   │   ├── page.tsx         # Main application page
+│   │   │   └── globals.css      # Global styles
+│   │   ├── components/
+│   │   │   ├── ChatPanel.tsx    # Chat interface component
+│   │   │   ├── GraphVisualization.tsx  # Force graph component
+│   │   │   └── NodePopup.tsx    # Node detail popup
+│   │   └── lib/
+│   │       └── api.ts           # API client functions
+│   ├── package.json
+│   └── next.config.ts
 ├── sap-o2c-data/                 # Dataset (JSONL files)
 ├── docker-compose.yml            # Neo4j orchestration
 └── README.md
@@ -151,7 +188,7 @@ The SAP O2C data is modeled as a property graph with the following structure:
                         └─────────────┘
 ```
 
-### Node Types
+### Node Types (12 Entity Types)
 
 | Node Label | Primary Key | Key Properties |
 |------------|-------------|----------------|
@@ -166,8 +203,9 @@ The SAP O2C data is modeled as a property graph with the following structure:
 | Payment | accountingDocument | clearingDate, amountInTransactionCurrency |
 | Material | product | productDescription, productType |
 | Plant | plant | plantName, salesOrganization |
+| Address | businessPartner + addressId | cityName, country, region |
 
-### Relationships
+### Relationships (17 Relationship Types)
 
 | Relationship | From | To | Description |
 |--------------|------|-----|-------------|
@@ -176,11 +214,15 @@ The SAP O2C data is modeled as a property graph with the following structure:
 | REFERENCES_MATERIAL | SalesOrderItem | Material | Item references a product |
 | PRODUCED_AT | SalesOrderItem | Plant | Production plant assignment |
 | FULFILLED_BY | SalesOrder | Delivery | Order fulfilled by delivery |
+| FULFILLS_ITEM | DeliveryItem | SalesOrderItem | Line-item level fulfillment |
 | SHIPPED_FROM | Delivery | Plant | Shipping point |
+| STORED_AT | DeliveryItem | Plant | Storage location |
 | BILLED_IN | Delivery | BillingDocument | Delivery billed in invoice |
+| BILLS_ITEM | BillingItem | DeliveryItem | Line-item level billing |
 | POSTED_AS | BillingDocument | JournalEntry | Invoice posted to accounting |
 | PAID_VIA | JournalEntry | Payment | Journal entry cleared by payment |
 | SOLD_TO | BillingDocument | Customer | Invoice sold-to party |
+| LOCATED_AT | Customer | Address | Customer address |
 
 ---
 
@@ -204,8 +246,9 @@ Query Results → [Stage 2: Response Generation] → Natural Language Answer
 
 1. **Schema Context**: Full graph schema provided (node labels, properties, relationships)
 2. **Safety Rules**: Only read-only operations (MATCH, RETURN, WITH, WHERE)
-3. **Few-Shot Examples**: 10+ curated examples covering common query patterns
+3. **Few-Shot Examples**: 15+ curated examples covering common query patterns
 4. **Edge Case Handling**: Instructions for generic queries (return samples, not placeholders)
+5. **Date Handling**: Special rules for date-based queries using string comparison
 
 ```python
 SYSTEM_PROMPT = """You are a database assistant that translates natural language 
@@ -217,6 +260,9 @@ IMPORTANT RULES:
 1. ONLY generate read-only Cypher queries (MATCH, RETURN, WITH, WHERE, ORDER BY, LIMIT)
 2. NEVER use CREATE, DELETE, SET, REMOVE, MERGE, DROP, or DETACH
 3. Always use the exact property names from the schema
+4. For amounts/quantities, use toFloat() for comparisons
+5. DATE HANDLING: Dates are stored as strings in format 'YYYY-MM-DD'. 
+   For "recent" queries, order by date DESC and limit results.
 ...
 
 FEW-SHOT EXAMPLES:
@@ -286,31 +332,21 @@ DOMAIN_KEYWORDS = [
     "order", "sales", "delivery", "invoice", "billing", "payment", "customer",
     "material", "product", "plant", "journal", "amount", "quantity", "shipped",
     "cancelled", "total", "revenue", "net", "gross", "outstanding", "overdue",
+    "fulfilled", "pending", "status", "created", "sap", "o2c", "order-to-cash",
+    "trace", "flow", "document", "incomplete", "broken", "unpaid", "cleared",
     ...
 ]
 
-def is_query_relevant(query: str) -> tuple[bool, str | None]:
-    query_lower = query.lower()
-    if any(kw in query_lower for kw in DOMAIN_KEYWORDS):
-        return True, None
-    if len(query.split()) <= 3:  # Short queries might be IDs
-        return True, None
-    return False, "This system is designed to answer questions related to the provided dataset only."
+OFF_TOPIC_KEYWORDS = [
+    "poem", "story", "joke", "movie", "song", "recipe", "game", "sport",
+    "capital of", "president of", "weather", "celebrity", "news", "politics",
+    ...
+]
 ```
 
 ### Layer 2: LLM Classification
 
-For queries that fail keyword check, a lightweight LLM call classifies relevance:
-
-```python
-def classify_relevance(question: str) -> bool:
-    messages = [
-        {"role": "system", "content": "Classify if question is related to business data. Reply 'RELEVANT' or 'IRRELEVANT'."},
-        {"role": "user", "content": question}
-    ]
-    response = client.chat.completions.create(model="gpt-4o-mini", messages=messages, temperature=0)
-    return "RELEVANT" in response.choices[0].message.content.upper()
-```
+For queries that pass keyword check but seem ambiguous, a lightweight LLM call (gpt-4o-mini) classifies relevance.
 
 ### Layer 3: Cypher Validation
 
@@ -319,32 +355,15 @@ DESTRUCTIVE_PATTERNS = [
     r"\bDELETE\b", r"\bDROP\b", r"\bDETACH\b", r"\bREMOVE\b",
     r"\bSET\b", r"\bCREATE\b", r"\bMERGE\b", r"\bCALL\b",
 ]
-
-def validate_cypher(cypher: str) -> tuple[bool, str | None]:
-    # Check for destructive operations
-    for pattern in DESTRUCTIVE_PATTERNS:
-        if re.search(pattern, cypher, re.IGNORECASE):
-            return False, "Query contains forbidden operation."
-    
-    # Check for LLM refusals disguised as queries
-    refusal_indicators = ["sorry", "cannot", "can't", "unable"]
-    if any(indicator in cypher.lower() for indicator in refusal_indicators):
-        return False, "Query outside dataset scope."
-    
-    # Must be a valid read query
-    if not re.search(r"\bMATCH\b|\bRETURN\b", cypher, re.IGNORECASE):
-        return False, "Invalid query format."
-    
-    return True, None
 ```
 
 ### Rejection Examples
 
 | User Query | Layer | Response |
 |------------|-------|----------|
-| "Write me a poem" | 1 | "This system is designed to answer questions related to the provided dataset only." |
-| "What's the weather today?" | 2 | "This system is designed to answer questions related to the provided dataset only." |
-| "DELETE all customers" | 3 | "Query contains forbidden operation." |
+| "Write me a poem" | 1 | "I can only answer questions about the SAP Order-to-Cash dataset..." |
+| "How do I cook pasta?" | 1 | "I can only answer questions about the SAP Order-to-Cash dataset..." |
+| "What's the weather today?" | 1 | "I can only answer questions about the SAP Order-to-Cash dataset..." |
 
 ---
 
@@ -352,57 +371,81 @@ def validate_cypher(cypher: str) -> tuple[bool, str | None]:
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.10+
+- Node.js 18+
 - Docker & Docker Compose
 - OpenAI API key
 
 ### 1. Clone and Setup
 
 ```bash
-git clone https://github.com/amithkm9/Dodge_AI_Assignment.git
-cd Dodge_AI_Assignment
+git clone https://github.com/yourusername/dodge-ai.git
+cd dodge-ai
 ```
 
-### 2. Configure Environment
-
-```bash
-cp .env.example .env
-# Edit .env with your OpenAI API key
-```
-
-### 3. Start Neo4j
+### 2. Start Neo4j
 
 ```bash
 docker-compose up -d neo4j
 ```
 
-### 4. Seed the Database
+### 3. Configure Backend Environment
+
+```bash
+cd backend
+cp .env.example .env
+# Edit .env with your configuration:
+# - OPENAI_API_KEY=your-key-here
+# - NEO4J_URI=bolt://localhost:7687
+# - NEO4J_USER=neo4j
+# - NEO4J_PASSWORD=your-password
+# - DATA_DIR=../sap-o2c-data
+```
+
+### 4. Install Backend Dependencies
 
 ```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
+```
+
+### 5. Seed the Database
+
+```bash
 python -m app.data.seed --data-dir ../sap-o2c-data
 ```
 
-### 5. Start the Backend
+### 6. Start the Backend
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-### 6. Start the Frontend
+### 7. Install Frontend Dependencies
 
 ```bash
 cd frontend
-pip install -r requirements.txt
-streamlit run streamlit_app.py
+npm install
 ```
 
-### 7. Access the Application
+### 8. Configure Frontend Environment
 
-- **Frontend**: http://localhost:8501
+```bash
+# Create .env.local
+echo "NEXT_PUBLIC_API_BASE=http://localhost:8000" > .env.local
+```
+
+### 9. Start the Frontend
+
+```bash
+npm run dev
+```
+
+### 10. Access the Application
+
+- **Frontend**: http://localhost:3000
 - **API Docs**: http://localhost:8000/docs
 - **Neo4j Browser**: http://localhost:7474
 
@@ -443,14 +486,6 @@ docker-compose -f docker-compose.prod.yml exec backend python -m app.data.seed -
 3. Set environment variables in Railway dashboard
 4. Deploy using `railway.toml` configuration
 
-### Option 4: Streamlit Cloud + External Backend
-
-1. Deploy backend to any cloud provider (Railway, Render, Fly.io)
-2. Deploy frontend to Streamlit Cloud:
-   - Connect GitHub repository
-   - Set `API_BASE` secret to your backend URL
-   - Main file: `frontend/streamlit_app.py`
-
 ### Neo4j Hosting Options
 
 - **Neo4j Aura** (Recommended): Free tier available at https://neo4j.com/cloud/aura/
@@ -467,17 +502,29 @@ docker-compose -f docker-compose.prod.yml exec backend python -m app.data.seed -
 |-------|--------------|
 | "Show me all customers and their total order amounts" | Aggregates revenue by customer |
 | "Which orders have not been delivered yet?" | Finds orders with incomplete delivery status |
-| "Trace the full flow of billing document 90001234" | Shows complete O2C path for specific invoice |
+| "Trace the full flow of sales order 740506" | Shows complete O2C path for specific order |
 | "Identify orders with broken flows" | Finds delivered-but-not-billed or billed-without-delivery |
-| "Which materials appear most frequently?" | Product popularity analysis |
+| "Which products are associated with the highest number of billing documents?" | Product billing frequency analysis |
 | "Show cancelled invoices" | Lists all cancelled billing documents |
+| "Find payments that cleared recently" | Shows recent payment activity |
+| "Which plant handles the most deliveries?" | Plant workload analysis |
 
 ### Graph Interaction
 
-1. **Click nodes** to inspect properties
+1. **Click nodes** to inspect properties in the popup
 2. **Expand nodes** to see connected entities
-3. **Search** by ID or name in sidebar
-4. **Highlighted nodes** show query results
+3. **Focus Mode** automatically activates when query returns ≤20 nodes
+4. **Toggle Focus Mode** to switch between filtered and full graph view
+5. **Clear button** removes all highlights and returns to full graph
+
+### Focus Mode
+
+When you ask a query like "Trace the flow for sales order 740506":
+- The graph automatically filters to show only the relevant nodes (Customer → Order → Delivery → etc.)
+- Non-relevant nodes are hidden
+- The view auto-zooms to fit the focused subgraph
+- Click "Show All" to see the full graph while keeping highlights
+- Click "Clear" to remove all highlights
 
 ---
 
@@ -486,7 +533,7 @@ docker-compose -f docker-compose.prod.yml exec backend python -m app.data.seed -
 ### Chat Endpoints
 
 #### POST /api/chat
-Streaming chat endpoint for natural language queries.
+Streaming chat endpoint for natural language queries (SSE).
 
 ```json
 {
@@ -495,17 +542,31 @@ Streaming chat endpoint for natural language queries.
 }
 ```
 
-Response: Server-Sent Events stream
+Response: Server-Sent Events stream with events:
+- `cypher`: The generated Cypher query
+- `result_count`: Number of results
+- `highlights`: Node IDs to highlight
+- `text`: Response text chunks
+- `done`: Stream complete
 
 #### POST /api/chat/simple
 Non-streaming chat endpoint.
+
+Request:
+```json
+{
+  "message": "Show me all customers",
+  "conversation_history": []
+}
+```
 
 Response:
 ```json
 {
   "answer": "Here are the customers...",
   "cypher_query": "MATCH (c:Customer) RETURN c.customerName LIMIT 25",
-  "highlighted_nodes": ["Customer_1000001", "Customer_1000002"]
+  "raw_results": [...],
+  "highlighted_nodes": ["Customer_310000108", "Customer_310000109"]
 }
 ```
 
@@ -528,6 +589,30 @@ Response:
   "neo4j": "connected"
 }
 ```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| "Backend Unavailable" | Ensure backend is running: `cd backend && uvicorn app.main:app --reload` |
+| "Neo4j not connected" | Check Neo4j is running: `docker-compose up -d neo4j` |
+| OpenAI "proxies" error | Downgrade httpx: `pip install httpx==0.27.2` |
+| Empty graph | Run database seed: `python -m app.data.seed --data-dir ../sap-o2c-data` |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| OPENAI_API_KEY | Yes | Your OpenAI API key |
+| NEO4J_URI | Yes | Neo4j connection URI (e.g., bolt://localhost:7687) |
+| NEO4J_USER | Yes | Neo4j username (default: neo4j) |
+| NEO4J_PASSWORD | Yes | Neo4j password |
+| DATA_DIR | No | Path to SAP O2C data (default: ../sap-o2c-data) |
+| OPENAI_MODEL | No | OpenAI model to use (default: gpt-4o) |
 
 ---
 

@@ -55,17 +55,93 @@ export default function ChatPanel({ messages, onSendMessage, onStop, isLoading }
     }
   };
 
-  const renderContent = (content: string) =>
-    content.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+  /** Render inline markdown: **bold** */
+  const renderInline = (text: string) =>
+    text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
       if (part.startsWith("**") && part.endsWith("**")) {
-        return (
-          <strong key={i} className="font-semibold text-gray-900">
-            {part.slice(2, -2)}
-          </strong>
-        );
+        return <strong key={i} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
       }
       return <span key={i}>{part}</span>;
     });
+
+  /** Parse a pipe-delimited row into cells, stripping leading/trailing pipes */
+  const parseRow = (row: string) =>
+    row.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+
+  /** Full markdown renderer: tables + bold + paragraphs */
+  const renderContent = (content: string) => {
+    // Normalise the response: the backend sometimes returns inline pipes with
+    // no real newlines. Re-insert newlines before every | that starts a new row.
+    const normalised = content
+      .replace(/\| \|/g, "|\n|")          // "| |" → newline between rows
+      .replace(/\|\s*\n\s*\|/g, "|\n|");  // already has newlines — clean up
+
+    const lines = normalised.split("\n");
+    const blocks: React.ReactNode[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i].trim();
+
+      // ── Table block: line starts and ends with | ──
+      if (line.startsWith("|") && line.endsWith("|")) {
+        const tableLines: string[] = [];
+        while (i < lines.length && lines[i].trim().startsWith("|")) {
+          tableLines.push(lines[i].trim());
+          i++;
+        }
+
+        // Separate header, separator, and data rows
+        const headerRow = tableLines[0];
+        const isSep = (r: string) => /^\|[\s\-:|]+\|$/.test(r.replace(/\|[-:\s]+/g, "|x|").replace(/\|x\|/g, "|"));
+        const hasSep = tableLines.length > 1 && /^[\|\-\s:]+$/.test(tableLines[1]);
+        const dataRows = hasSep ? tableLines.slice(2) : tableLines.slice(1);
+        void isSep;
+
+        blocks.push(
+          <div key={`tbl-${blocks.length}`} className="my-3 overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+            <table className="w-full text-sm text-left border-collapse">
+              {hasSep && (
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {parseRow(headerRow).map((cell, ci) => (
+                      <th key={ci} className="px-4 py-2.5 text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">
+                        {renderInline(cell)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+              )}
+              <tbody>
+                {dataRows.map((row, ri) => (
+                  <tr key={ri} className={`border-b border-gray-100 last:border-0 ${ri % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
+                    {parseRow(row).map((cell, ci) => (
+                      <td key={ci} className="px-4 py-2.5 text-[13.5px] text-gray-700 whitespace-nowrap">
+                        {renderInline(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        continue;
+      }
+
+      // ── Regular text line ──
+      if (line !== "") {
+        blocks.push(
+          <p key={`p-${blocks.length}`} className="text-[15px] leading-[1.75] text-gray-800 break-words mb-1">
+            {renderInline(line)}
+          </p>
+        );
+      }
+      i++;
+    }
+
+    return blocks;
+  };
 
   const showSuggestions = messages.length <= 1 && !isLoading;
 
@@ -83,9 +159,7 @@ export default function ChatPanel({ messages, onSendMessage, onStop, isLoading }
                 </div>
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Dodge AI</p>
-                  <p className="text-[15px] leading-[1.75] text-gray-800 break-words">
-                    {renderContent(msg.content)}
-                  </p>
+                  <div>{renderContent(msg.content)}</div>
                   {msg.cypher && (
                     <div className="pt-1">
                       <button
